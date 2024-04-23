@@ -4,11 +4,15 @@ import hashlib
 import os
 import shutil
 
+from diff import get_the_difference
+
 
 class SimpleVCS:
     def __init__(self):
         self.repo_path = None
         self.repo_dir = ".simple_vcs"
+        self.current_branch = "master"
+        self.branches = {"master": "master"}
 
     def __post_init__(self):
         if os.path.exists(self.repo_dir):
@@ -16,7 +20,7 @@ class SimpleVCS:
 
     def init(self):
         self.repo_path = os.path.join(os.getcwd(), self.repo_dir)
-        os.makedirs(self.repo_path)
+        os.makedirs(self.repo_path, exist_ok=True)
         print("Initialized empty repository in", self.repo_path)
 
     def hash_file(self, file_path):
@@ -35,6 +39,12 @@ class SimpleVCS:
         shutil.copyfile(file_path, dest_path)
         print(f"Added {file_path} to index")
 
+    def get_list_commit(self):
+        commit_dir = os.path.join(self.repo_path, "commits")
+        commits = os.listdir(commit_dir)
+
+        return commits.sort(key=lambda x: os.path.getmtime(x))
+
     def commit(self, message):
         if not self.repo_path:
             print("Repository not initialized. Please run 'init' first.")
@@ -44,18 +54,20 @@ class SimpleVCS:
         commit_dir = os.path.join(self.repo_path, "commits", commit_hash)
         os.makedirs(commit_dir)
 
-        for root, dirs, files in os.walk(self.repo_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                dest_path = os.path.join(commit_dir, os.path.relpath(file_path, self.repo_path))
+        added_files = [f for f in os.listdir(self.repo_path) if os.path.isfile(os.path.join(self.repo_path, f))]
 
-                if os.path.isfile(file_path):
-                    shutil.copyfile(file_path, dest_path)
+        for file_name in added_files:
+            file_path = os.path.join(self.repo_path, file_name)
+            dest_path = os.path.join(commit_dir, file_name)
+            shutil.copyfile(file_path, dest_path)
 
         with open(os.path.join(commit_dir, "message.txt"), "w") as f:
             f.write(message)
 
-        print("Committed changes with hash:", commit_hash)
+        with open(os.path.join(self.repo_path ,"history/commits.txt"), "w") as f:
+            f.write(f'commit_hash \n')
+
+        print(f"Committed changes to branch '{self.current_branch}' with hash:", commit_hash)
 
     def log(self):
         if not self.repo_path:
@@ -106,6 +118,9 @@ if __name__ == "__main__":
         elif command.startswith('commit -m'):
             message = command.replace('commit -m', '')
             vcs.commit(message)
+            commit_list = vcs.get_list_commit()
+            print(get_the_difference(file_path_1=commit_list[-1]+'example.csv',
+                                     file_path_2=commit_list[-2]+'example.csv'))
         elif command == "log":
             vcs.log()
         elif command == "exit":
